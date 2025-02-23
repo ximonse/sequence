@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Play, Pause, Download, GripVertical, Sun, Moon, Palette, Square } from 'lucide-react';
 
-const completedTaskStyle = "line-through opacity-50"; // Style for completed tasks
-
-function TaskSequencer() {
+const TaskSequencer = () => {
   const themes = {
     light: {
       name: 'Ljust (Claude)',
@@ -69,13 +68,13 @@ function TaskSequencer() {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [theme, setTheme] = useState('light');
 
-  function stopSequence() {
+  const stopSequence = useCallback(() => {
     console.log('Stopping sequence');
     setIsRunning(false);
     setCurrentTaskIndex(-1);
     setTimeLeft(0);
     setIsPaused(false);
-  }
+  }, []);
 
   const completeTask = useCallback(() => {
     const currentTask = tasks[currentTaskIndex];
@@ -97,9 +96,9 @@ function TaskSequencer() {
     } else {
       stopSequence();
     }
-  }, [currentTaskIndex, tasks]);
+  }, [currentTaskIndex, tasks, stopSequence]);
 
-  function startSequence() {
+  const startSequence = useCallback(() => {
     if (tasks.length > 0) {
       const firstTask = tasks[0];
       console.log('Starting sequence with task:', firstTask);
@@ -109,142 +108,30 @@ function TaskSequencer() {
       setIsPaused(false);
       setCompletedTasks([]);
     }
-  }
+  }, [tasks]);
 
-  function togglePause() {
+  const togglePause = useCallback(() => {
     console.log('Toggling pause, current state:', isPaused);
-    setIsPaused(!isPaused);
-  }
+    setIsPaused(prev => !prev);
+  }, [isPaused]);
 
-  // Timer effect
-  useEffect(() => {
-    let timer;
-    
-    if (isRunning && !isPaused && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft(prevTime => {
-          console.log('Timer tick, current time:', prevTime);
-          if (prevTime <= 1) {
-            completeTask();
-            return 0;
-          }
-          return prevTime - 1;
-        });
-      }, 1000);
-
-      console.log('Timer started:', { isRunning, isPaused, timeLeft });
+  // Playback sound function
+  const playCompletionSound = useCallback(() => {
+    try {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 800;
+      gainNode.gain.value = 0.5;
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.8);
+    } catch (error) {
+      console.warn('Could not play sound:', error);
     }
-
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-        console.log('Timer cleared');
-      }
-    };
-  }, [isRunning, isPaused, completeTask, timeLeft]);
-
-  function formatTime(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  function handleInputChange(e) {
-    const input = e.target.value;
-    setTaskInput(input);
-    
-    // Debounce the task parsing to prevent freezing
-    const timeoutId = setTimeout(() => {
-      const lines = input.split('\n').filter(line => line.trim());
-      const parsedTasks = lines.map(line => {
-        const isUnbreakable = line.includes('!odelbar');
-        const cleanLine = line.replace('!odelbar', '').trim();
-        const [task, minutes] = cleanLine.split(':').map(part => part.trim());
-        return {
-          task: task || '',
-          minutes: parseInt(minutes) || 0,
-          isUnbreakable
-        };
-      });
-      setTasks(parsedTasks);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }
-
-  function handleDragStart(e, index) {
-    setDraggedIndex(index);
-    e.currentTarget.classList.add('opacity-50');
-  }
-
-  function handleDragEnd(e) {
-    e.currentTarget.classList.remove('opacity-50');
-    setDraggedIndex(null);
-  }
-
-  function handleDragOver(e) {
-    e.preventDefault();
-  }
-
-  function handleDrop(e, dropIndex) {
-    e.preventDefault();
-    if (draggedIndex === null) return;
-
-    const draggedUpcomingIndex = draggedIndex - (currentTaskIndex + 1);
-    const dropUpcomingIndex = dropIndex - (currentTaskIndex + 1);
-
-    const newTasks = [...tasks];
-    const upcomingTasks = newTasks.slice(currentTaskIndex + 1);
-    const [reorderedItem] = upcomingTasks.splice(draggedUpcomingIndex, 1);
-    upcomingTasks.splice(dropUpcomingIndex, 0, reorderedItem);
-
-    setTasks([
-      ...newTasks.slice(0, currentTaskIndex + 1),
-      ...upcomingTasks
-    ]);
-  }
-
-  function exportTasks() {
-    const exportData = {
-      originalSequence: tasks,
-      completedTasks: completedTasks,
-      exportedAt: new Date().toLocaleString()
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'task-sequence-export.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  const TimelineCells = ({ totalMinutes, elapsedSeconds }) => {
-    const minutesArray = Array.from({ length: totalMinutes }, (_, i) => i);
-    const currentMinute = Math.floor(elapsedSeconds / 60);
-    
-    return (
-      <div className="flex overflow-x-auto pb-2 mb-4">
-        {minutesArray.map((minute) => (
-          <div
-            key={minute}
-            className={`
-              flex-shrink-0 w-6 h-6 border rounded-sm mx-0.5
-              flex items-center justify-center text-xs
-              ${minute < currentMinute ? themes[theme].primary + ' text-white' : 
-                minute === currentMinute ? themes[theme].accent + ' ' + themes[theme].accentBorder : 
-                themes[theme].panel + ' ' + themes[theme].border}
-            `}
-          >
-            {minute + 1}
-          </div>
-        ))}
-      </div>
-    );
-  };
+  }, []);
 
   return (
     <div className={`min-h-screen p-6 ${themes[theme].bg} transition-colors duration-200`}>
