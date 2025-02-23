@@ -21,7 +21,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Set up Node
@@ -29,15 +29,16 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: 'sequence/package-lock.json'  # Specify the correct path
+          cache-dependency-path: 'sequence/package-lock.json'  # Ensure correct path
+
+      - name: Move to correct directory
+        run: cd sequence && ls -la  # Check if package-lock.json exists
 
       - name: Install dependencies
-        run: npm install
-        working-directory: sequence  # Specify the working directory
+        run: cd sequence && npm install  # Manually switch to sequence folder
 
       - name: Build
-        run: npm run build
-        working-directory: sequence  # Specify the working directory
+        run: cd sequence && npm run build  # Build inside the correct folder
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -45,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './sequence/dist'  # Make sure this is the correct build output path
+          path: 'sequence/dist'  # Ensure correct path to build output
 
       - name: Deploy to GitHub Pages
         id: deployment
