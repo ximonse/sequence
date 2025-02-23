@@ -66,6 +66,7 @@ const TaskSequencer = () => {
     const [completedTasks, setCompletedTasks] = useState([]);
     const [draggedIndex, setDraggedIndex] = useState(null);
     const [theme, setTheme] = useState('light');
+    const [isFlashing, setIsFlashing] = useState(false); // Ny state för blinkande skärm
 
     const playCompletionSound = useCallback(() => {
         try {
@@ -77,11 +78,25 @@ const TaskSequencer = () => {
             gainNode.connect(context.destination);
 
             oscillator.type = 'sine';
-            oscillator.frequency.value = 800;
-            gainNode.gain.value = 0.5;
+            oscillator.frequency.value = 600; // Lite lägre frekvens för ett fylligare ljud
+            gainNode.gain.value = 0.6; // Justera volymen något
 
             oscillator.start();
-            oscillator.stop(context.currentTime + 0.8);
+            oscillator.stop(context.currentTime + 1); // Lite längre ljud
+
+            // Skärmblinkning - start
+            setIsFlashing(true);
+            setTimeout(() => {
+                setIsFlashing(false); // Släck ner blinkning efter kort tid
+                setTimeout(() => {
+                    setIsFlashing(true); // Blink nummer två
+                    setTimeout(() => {
+                        setIsFlashing(false); // Släck ner blinkning igen
+                    }, 50); // Kort paus mellan blinkningarna
+                }, 50); // Kort paus innan andra blinkningen
+            }, 50); // Kort blinkduration (50ms)
+            // Skärmblinkning - slut
+
         } catch (error) {
             console.warn('Could not play sound:', error);
         }
@@ -92,6 +107,7 @@ const TaskSequencer = () => {
         setCurrentTaskIndex(-1);
         setTimeLeft(0);
         setIsPaused(false);
+        setIsFlashing(false); // Stoppa blinkning om sekvensen stoppas
     }, []);
 
     const completeTask = useCallback(() => {
@@ -124,6 +140,7 @@ const TaskSequencer = () => {
             setIsRunning(true);
             setIsPaused(false);
             setCompletedTasks([]);
+            setIsFlashing(false); // Se till att blinkning är avstängd vid start
         }
     }, [tasks]);
 
@@ -263,7 +280,7 @@ const TaskSequencer = () => {
 
 
     return (
-        <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200`}>
+        <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? 'bg-white' : ''}`}> {/* Blinkande bakgrund */}
             <div className="max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
                 {Object.entries(themes).map(([key, value]) => (
                     <button
@@ -376,7 +393,7 @@ const TaskSequencer = () => {
                         <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
                         <ul className="space-y-2">
                             {completedTasks.map((task, index) => (
-                                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center`}>
+                                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center opacity-70 line-through text-gray-500`}> {/* Gråmarkering och striketrough här */}
                                     <div>
                                         <span className={`${themes[theme].text}`}>{task.task}</span>
                                     </div>
