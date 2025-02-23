@@ -1,9 +1,10 @@
+```react
 import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Play, Pause, Download, GripVertical, Sun, Moon, Palette, Square } from 'lucide-react';
 
 const TaskSequencer = () => {
-  const themes = {
+  const themes = useMemo(() => ({
     light: {
       name: 'Ljust (Claude)',
       bg: 'bg-white',
@@ -56,8 +57,7 @@ const TaskSequencer = () => {
       highlight: 'hover:border-purple-400',
       muted: 'text-purple-800'
     }
-  };
-
+  }), []);
   const [taskInput, setTaskInput] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -68,8 +68,27 @@ const TaskSequencer = () => {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [theme, setTheme] = useState('light');
 
+  const playCompletionSound = useCallback(() => {
+    try {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 800;
+      gainNode.gain.value = 0.5;
+
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.8);
+    } catch (error) {
+      console.warn('Could not play sound:', error);
+    }
+  }, []);
+
   const stopSequence = useCallback(() => {
-    console.log('Stopping sequence');
     setIsRunning(false);
     setCurrentTaskIndex(-1);
     setTimeLeft(0);
@@ -79,10 +98,10 @@ const TaskSequencer = () => {
   const completeTask = useCallback(() => {
     const currentTask = tasks[currentTaskIndex];
     if (!currentTask) return;
-    
+
     const completionTime = new Date().toLocaleTimeString();
     playCompletionSound();
-    
+
     setCompletedTasks(prev => [...prev, {
       ...currentTask,
       completedAt: completionTime
@@ -96,12 +115,11 @@ const TaskSequencer = () => {
     } else {
       stopSequence();
     }
-  }, [currentTaskIndex, tasks, stopSequence]);
+  }, [currentTaskIndex, tasks, stopSequence, playCompletionSound]);
 
   const startSequence = useCallback(() => {
     if (tasks.length > 0) {
       const firstTask = tasks[0];
-      console.log('Starting sequence with task:', firstTask);
       setCurrentTaskIndex(0);
       setTimeLeft(firstTask.minutes * 60);
       setIsRunning(true);
@@ -111,39 +129,148 @@ const TaskSequencer = () => {
   }, [tasks]);
 
   const togglePause = useCallback(() => {
-    console.log('Toggling pause, current state:', isPaused);
     setIsPaused(prev => !prev);
-  }, [isPaused]);
-
-  // Playback sound function
-  const playCompletionSound = useCallback(() => {
-    try {
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = context.createOscillator();
-      const gainNode = context.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(context.destination);
-      oscillator.type = 'sine';
-      oscillator.frequency.value = 800;
-      gainNode.gain.value = 0.5;
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.8);
-    } catch (error) {
-      console.warn('Could not play sound:', error);
-    }
   }, []);
 
+  // Timer effect
+  useEffect(() => {
+    let timer;
+
+    if (isRunning && !isPaused && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prevTime => {
+          if (prevTime <= 1) {
+            completeTask();
+            return 0;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [isRunning, isPaused, completeTask, timeLeft]);
+
+  const formatTime = useCallback((seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  const handleInputChange = useCallback((e) => {
+    const input = e.target.value;
+    setTaskInput(input);
+
+    // Debounce the task parsing to prevent freezing
+    const timeoutId = setTimeout(() => {
+      const lines = input.split('\n').filter(line => line.trim());
+      const parsedTasks = lines.map(line => {
+        const isUnbreakable = line.includes('!odelbar');
+        const cleanLine = line.replace('!odelbar', '').trim();
+        const [task, minutes] = cleanLine.split(':').map(part => part.trim());
+        return {
+          task: task || '',
+          minutes: parseInt(minutes) || 0,
+          isUnbreakable
+        };
+      });
+      setTasks(parsedTasks);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+
+  const handleDragStart = useCallback((e, index) => {
+    setDraggedIndex(index);
+    e.currentTarget.classList.add('opacity-50');
+  }, []);
+
+  const handleDragEnd = useCallback((e) => {
+    e.currentTarget.classList.remove('opacity-50');
+    setDraggedIndex(null);
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+  }, []);
+
+  const handleDrop = useCallback((e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+
+    const draggedUpcomingIndex = draggedIndex - (currentTaskIndex + 1);
+    const dropUpcomingIndex = dropIndex - (currentTaskIndex + 1);
+
+    const newTasks = [...tasks];
+    const upcomingTasks = newTasks.slice(currentTaskIndex + 1);
+    const [reorderedItem] = upcomingTasks.splice(draggedUpcomingIndex, 1);
+    upcomingTasks.splice(dropUpcomingIndex, 0, reorderedItem);
+
+    setTasks([
+      ...newTasks.slice(0, currentTaskIndex + 1),
+      ...upcomingTasks
+    ]);
+  }, [currentTaskIndex, draggedIndex, tasks]);
+
+
+  const exportTasks = useCallback(() => {
+    const exportData = {
+      originalSequence: tasks,
+      completedTasks: completedTasks,
+      exportedAt: new Date().toLocaleString()
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'task-sequence-export.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [tasks, completedTasks]);
+
+
+  const TimelineCells = React.memo(({ totalMinutes, elapsedSeconds }) => {
+    const minutesArray = Array.from({ length: totalMinutes }, (_, i) => i);
+    const currentMinute = Math.floor(elapsedSeconds / 60);
+
+    return (
+      <div className="flex flex-wrap gap-1.5 pb-2 mb-4">
+        {minutesArray.map((minute) => (
+          <div
+            key={minute}
+            className={`
+              w-6 h-6 border rounded-full
+               flex items-center justify-center text-xs
+              ${minute < currentMinute ? themes[theme].primary + ' text-white' :
+                 minute === currentMinute ? themes[theme].accent + ' ' + themes[theme].accentBorder :
+                 themes[theme].panel + ' ' + themes[theme].border}
+            `}
+          >
+            {minute + 1}
+          </div>
+        ))}
+      </div>
+    );
+  });
+
+
   return (
-    <div className={`min-h-screen p-6 ${themes[theme].bg} transition-colors duration-200`}>
+    <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200`}>
       <div className="max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
         {Object.entries(themes).map(([key, value]) => (
           <button
             key={key}
             onClick={() => setTheme(key)}
             className={`p-2 rounded-lg transition-colors ${
-              theme === key 
-                ? `${themes[theme].primary} text-white` 
-                : `${themes[theme].panel} ${themes[theme].text}`
+              theme === key
+                 ? `${themes[theme].primary} text-white`
+                 : `${themes[theme].panel} ${themes[theme].text}`
             }`}
             title={value.name}
           >
@@ -154,7 +281,6 @@ const TaskSequencer = () => {
           </button>
         ))}
       </div>
-
       <div className="max-w-2xl mx-auto">
         <div className={`mb-8 ${themes[theme].panel} rounded-lg p-6 transition-colors`}>
           <textarea
@@ -163,7 +289,7 @@ const TaskSequencer = () => {
             placeholder="Ange uppgifter (en per rad) i formatet:&#10;uppgiftens namn : minuter&#10;exempel:&#10;Första uppgiften : 20&#10;Paus : 5&#10;Andra uppgiften : 30&#10;&#10;Lägg till !odelbar för uppgifter som inte ska delas upp:&#10;Viktigt möte !odelbar : 45"
             className={`w-full h-48 p-4 border rounded-lg font-mono ${themes[theme].text} ${themes[theme].bg} ${themes[theme].border} focus:ring-2 focus:ring-opacity-50 focus:ring-current outline-none transition-colors`}
           />
-          
+
           <div className="mt-4 space-x-3">
             <button
               onClick={startSequence}
@@ -172,7 +298,7 @@ const TaskSequencer = () => {
             >
               Starta Sekvens
             </button>
-            
+
             {isRunning && (
               <>
                 <button
@@ -189,7 +315,7 @@ const TaskSequencer = () => {
                 </button>
               </>
             )}
-            
+
             {completedTasks.length > 0 && (
               <button
                 onClick={exportTasks}
@@ -206,9 +332,9 @@ const TaskSequencer = () => {
             <h2 className={`text-2xl font-semibold ${themes[theme].text} mb-3`}>
               Aktuell Uppgift: {tasks[currentTaskIndex].task}
             </h2>
-            <TimelineCells 
-              totalMinutes={tasks[currentTaskIndex].minutes} 
-              elapsedSeconds={tasks[currentTaskIndex].minutes * 60 - timeLeft}
+            <TimelineCells
+               totalMinutes={tasks[currentTaskIndex].minutes}
+               elapsedSeconds={tasks[currentTaskIndex].minutes * 60 - timeLeft}
             />
             <p className={`text-4xl font-mono ${themes[theme].text} mb-4`}>{formatTime(timeLeft)}</p>
             <button
@@ -222,44 +348,39 @@ const TaskSequencer = () => {
 
         {isRunning && tasks.length > currentTaskIndex + 1 && (
           <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors mb-6`}>
-            <h3 className={`text-lg font-semibold ${themes[theme].text} mb-4`}>
-              Kommande Uppgifter <span className={`text-sm font-normal ${themes[theme].muted}`}>(dra för att ordna om)</span>
-            </h3>
-            <div className="space-y-2">
-              {tasks.slice(currentTaskIndex + 1).map((task, index) => {
-                const actualIndex = index + currentTaskIndex + 1;
-                return (
-                  <div
-                    key={actualIndex}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, actualIndex)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, actualIndex)}
-                    className={`flex items-center p-3 border rounded-lg ${themes[theme].border} ${themes[theme].highlight} transition-colors cursor-move`}
-                  >
-                    <GripVertical className={`mr-3 ${themes[theme].muted}`} size={16} />
-                    <span className={themes[theme].text}>{task.task}</span>
-                    <span className={`ml-auto ${themes[theme].muted}`}>{task.minutes}m</span>
-                  </div>
-                );
-              })}
-            </div>
+            <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Kommande Uppgifter</h2>
+            <ul className="space-y-2">
+              {tasks.slice(currentTaskIndex + 1).map((task, index) => (
+                <li
+                  key={index}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, currentTaskIndex + 1 + index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, currentTaskIndex + 1 + index)}
+                  className={`relative p-3 rounded-lg ${themes[theme].bg} ${themes[theme].highlight} border-2 ${themes[theme].border} cursor-move flex items-center`}
+                >
+                  <GripVertical className="absolute left-1 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                  <span className={`ml-4 ${themes[theme].text}`}>{task.task}</span>
+                  <span className={`ml-auto font-mono text-sm ${themes[theme].muted}`}>{task.minutes} min</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
         {completedTasks.length > 0 && (
           <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors`}>
-            <h3 className={`text-lg font-semibold ${themes[theme].text} mb-4`}>
-              Slutförda Uppgifter
-            </h3>
+            <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
             <ul className="space-y-2">
               {completedTasks.map((task, index) => (
-                <li 
-                  key={index} 
-                  className={`p-3 border rounded-lg ${themes[theme].border} ${completedTaskStyle} transition-colors`}
-                >
-                  {task.task} - Completed at {task.completedAt}
+                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center`}>
+                  <div>
+                    <span className={`${themes[theme].text}`}>{task.task}</span>
+                  </div>
+                  <div className="font-mono text-sm text-right">
+                    <span className={`${themes[theme].muted}`}>Slutfört: {task.completedAt}</span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -268,46 +389,7 @@ const TaskSequencer = () => {
       </div>
     </div>
   );
-}
-
-// Add missing sound functions back
-function playHalfwayBeep() {
-  const context = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = context.createOscillator();
-  const gainNode = context.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(context.destination);
-  oscillator.type = 'sine';
-  oscillator.frequency.value = 600;
-  gainNode.gain.value = 0.5;
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.2);
-}
-
-function playWarningBeep() {
-  const context = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = context.createOscillator();
-  const gainNode = context.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(context.destination);
-  oscillator.type = 'sine';
-  oscillator.frequency.value = 400;
-  gainNode.gain.value = 0.5;
-  oscillator.start();
-  oscillator.stop(context.currentTime + 2.0);
-}
-
-function playCompletionSound() {
-  const context = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = context.createOscillator();
-  const gainNode = context.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(context.destination);
-  oscillator.type = 'sine';
-  oscillator.frequency.value = 800;
-  gainNode.gain.value = 0.5;
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.8);
-}
+};
 
 export default TaskSequencer;
+```
