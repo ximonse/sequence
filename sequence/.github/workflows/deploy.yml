@@ -24,6 +24,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Debug - List Files Before Setup
+        run: ls -la
+        working-directory: sequence  # Ensure this is where your files are
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -31,14 +35,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'sequence/package-lock.json'  # Ensure correct path
 
-      - name: Move to correct directory
-        run: cd sequence && ls -la  # Check if package-lock.json exists
-
       - name: Install dependencies
-        run: cd sequence && npm install  # Manually switch to sequence folder
+        run: npm install
+        working-directory: sequence  # Ensure commands run inside 'sequence/'
 
       - name: Build
-        run: cd sequence && npm run build  # Build inside the correct folder
+        run: npm run build
+        working-directory: sequence  # Ensure commands run inside 'sequence/'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
