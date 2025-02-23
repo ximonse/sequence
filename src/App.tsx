@@ -68,7 +68,8 @@ const TaskSequencer = () => {
     const [theme, setTheme] = useState('light');
     const [isFlashing, setIsFlashing] = useState(false); // Ny state för blinkande skärm
 
-    const playCompletionSound = useCallback(() => {
+const playCompletionSound = useCallback(() => {
+        console.log("playCompletionSound called"); // Lägg till detta för felsökning
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
