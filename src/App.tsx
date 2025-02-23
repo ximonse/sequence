@@ -85,7 +85,7 @@ const playCompletionSound = useCallback(() => {
             oscillator.start();
             oscillator.stop(context.currentTime + 1); // Lite längre ljud
 
-            // Skärmblinkning - start
+			// Skärmblinkning - start 
             setIsFlashing(true);
             setTimeout(() => {
                 setIsFlashing(false); // Släck ner blinkning efter kort tid
@@ -93,9 +93,9 @@ const playCompletionSound = useCallback(() => {
                     setIsFlashing(true); // Blink nummer två
                     setTimeout(() => {
                         setIsFlashing(false); // Släck ner blinkning igen
-                    }, 50); // Kort paus mellan blinkningarna
-                }, 50); // Kort paus innan andra blinkningen
-            }, 50); // Kort blinkduration (50ms)
+                    }, 200); // *Längre paus mellan blinkningarna (200ms)*
+                }, 200); // *Längre paus innan andra blinkningen (200ms)*
+            }, 200); // *Längre blinkduration (200ms)*
             // Skärmblinkning - slut
 
         } catch (error) {
