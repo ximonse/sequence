@@ -113,13 +113,42 @@ function TaskSequencer() {
         oscillator.start();
         oscillator.stop(context.currentTime + 0.5);
         break;
-      case 'complete':
+		case 'complete':
+        // Create pattern: "bep bep bep beeeep"
         oscillator.frequency.value = 800;
         gainNode.gain.value = 0.3;
-        oscillator.start();
-        oscillator.stop(context.currentTime + 0.3);
+        
+        // First three short beeps
+        for(let i = 0; i < 3; i++) {
+          oscillator.start(context.currentTime + (i * 0.5)); // Start with 0.5s gap between beeps
+          oscillator.stop(context.currentTime + (i * 0.5) + 0.1); // Each beep is 0.1s long
+        }
+        
+        // Final long beep
+        const finalBeepStart = context.currentTime + 1.5; // Start after the three short beeps
+        oscillator.start(finalBeepStart);
+        oscillator.stop(finalBeepStart + 0.6); // Long beep is 0.6s	
         break;
-      default:
+		case 'allComplete':
+        // Victory fanfare: "do-do-do-dooooo!"
+        oscillator.type = 'square'; // More video-game like sound
+        gainNode.gain.value = 0.2;
+        
+        // Rising melody
+        const notes = [400, 500, 600, 800];
+        const noteDuration = 0.15;
+        
+        notes.forEach((freq, i) => {
+          oscillator.frequency.setValueAtTime(freq, context.currentTime + (i * noteDuration));
+          // Last note held longer
+          if (i === notes.length - 1) {
+            oscillator.start(context.currentTime + (i * noteDuration));
+            oscillator.stop(context.currentTime + (i * noteDuration) + 0.5);
+          } else {
+            oscillator.start(context.currentTime + (i * noteDuration));
+            oscillator.stop(context.currentTime + ((i + 1) * noteDuration));
+          }
+        });
         break;
     }
   }, []);
@@ -170,6 +199,7 @@ function TaskSequencer() {
       setTimeLeft(tasks[currentTaskIndex + 1].minutes * 60);
       setIsPaused(false);
     } else {
+      playSound('allComplete'); // Add this line to play victory sound
       setIsRunning(false);
       setCurrentTaskIndex(-1);
       setTimeLeft(0);
