@@ -677,7 +677,7 @@ function startSequence() {
       <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors mt-6`}>
         <h3 className={`text-lg font-semibold ${themes[theme].text} mb-4`}>
           Completed Tasks
-        </h3>
+        </h4>
         <ul className="space-y-2">
           {completedTasks.map((task, index) => (
             <li key={index} className={`p-3 border rounded-lg ${themes[theme].border} ${completedTaskStyle} transition-colors`}>
