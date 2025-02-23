@@ -115,19 +115,30 @@ function TaskSequencer() {
         break;
 		case 'complete':
         // Create pattern: "bep bep bep beeeep"
-        oscillator.frequency.value = 800;
-        gainNode.gain.value = 0.3;
+        let beepTime = context.currentTime;
         
-        // First three short beeps
-        for(let i = 0; i < 3; i++) {
-          oscillator.start(context.currentTime + (i * 0.5)); // Start with 0.5s gap between beeps
-          oscillator.stop(context.currentTime + (i * 0.5) + 0.1); // Each beep is 0.1s long
+        // Create separate oscillators for each beep
+        for(let i = 0; i < 4; i++) {
+          const beepOsc = context.createOscillator();
+          const beepGain = context.createGain();
+          beepOsc.connect(beepGain);
+          beepGain.connect(context.destination);
+          
+          beepOsc.frequency.value = 800;
+          beepGain.gain.value = 0.3;
+          beepOsc.type = 'sine';
+          
+          if (i < 3) {
+            // Short beeps
+            beepOsc.start(beepTime);
+            beepOsc.stop(beepTime + 0.1);
+            beepTime += 0.5; // Gap between beeps
+          } else {
+            // Final long beep
+            beepOsc.start(beepTime);
+            beepOsc.stop(beepTime + 0.6);
+          }
         }
-        
-        // Final long beep
-        const finalBeepStart = context.currentTime + 1.5; // Start after the three short beeps
-        oscillator.start(finalBeepStart);
-        oscillator.stop(finalBeepStart + 0.6); // Long beep is 0.6s	
         break;
 		case 'allComplete':
         // Victory fanfare: "do-do-do-dooooo!"
