@@ -23,33 +23,29 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Debug - List Files Before Setup
-        run: ls -la
-        working-directory: sequence  # Ensure this is where your files are
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: 'package-lock.json'  # Ensure correct path
+          cache-dependency-path: 'package-lock.json'  # ✅ Make sure this is correct
 
       - name: Install dependencies
         run: npm install
         working-directory: .
 
-      - name: Build
+      - name: Build project
         run: npm run build
         working-directory: .
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'dist'  # Ensure correct path to build output
+          path: 'dist'  # ✅ Fix this path to match your build output
 
       - name: Deploy to GitHub Pages
         id: deployment
