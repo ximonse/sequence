@@ -29,22 +29,24 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
-      
+          cache-dependency-path: 'sequence/package-lock.json'  # Specify the correct path
+
       - name: Install dependencies
         run: npm install
-      
+        working-directory: sequence  # Specify the working directory
+
       - name: Build
         run: npm run build
-      
+        working-directory: sequence  # Specify the working directory
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
-      
+          path: './sequence/dist'  # Make sure this is the correct build output path
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
