@@ -1,93 +1,86 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, Download, GripVertical, Sun, Moon, Palette, BarChart } from 'lucide-react';
+import { Play, Pause, Download, GripVertical, Sun, Moon, Palette } from 'lucide-react';
 
-// Theme configurations
 const themes = {
   light: {
-    name: 'Ljust',
+    name: 'Light',
     bg: 'bg-white',
     text: 'text-gray-700',
     panel: 'bg-gray-50',
     border: 'border-gray-200',
-    primary: 'bg-emerald-600 hover:bg-emerald-700',
+    primary: 'bg-blue-600 hover:bg-blue-700',
     secondary: 'bg-gray-600 hover:bg-gray-700',
-    accent: 'bg-emerald-50',
-    accentBorder: 'border-emerald-200',
-    highlight: 'hover:border-emerald-200',
+    accent: 'bg-blue-50',
+    accentBorder: 'border-blue-200',
+    highlight: 'hover:border-blue-200',
     muted: 'text-gray-500'
   },
   dark: {
-    name: 'Mörkt',
+    name: 'Dark',
     bg: 'bg-gray-900',
     text: 'text-gray-100',
     panel: 'bg-gray-800',
     border: 'border-gray-700',
-    primary: 'bg-emerald-500 hover:bg-emerald-600',
+    primary: 'bg-blue-500 hover:bg-blue-600',
     secondary: 'bg-gray-600 hover:bg-gray-700',
     accent: 'bg-gray-800',
-    accentBorder: 'border-emerald-700',
-    highlight: 'hover:border-emerald-500',
+    accentBorder: 'border-blue-700',
+    highlight: 'hover:border-blue-500',
     muted: 'text-gray-400'
+  },
+  soft: {
+    name: 'Soft',
+    bg: 'bg-gray-50',
+    text: 'text-gray-700',
+    panel: 'bg-gray-100',
+    border: 'border-gray-200',
+    primary: 'bg-gray-600 hover:bg-gray-700',
+    secondary: 'bg-gray-500 hover:bg-gray-600',
+    accent: 'bg-yellow-50',
+    accentBorder: 'border-yellow-200',
+    highlight: 'hover:border-yellow-200',
+    muted: 'text-gray-500'
+  },
+  ocean: {
+    name: 'Ocean',
+    bg: 'bg-blue-50',
+    text: 'text-gray-700',
+    panel: 'bg-white',
+    border: 'border-blue-200',
+    primary: 'bg-blue-600 hover:bg-blue-700',
+    secondary: 'bg-blue-500 hover:bg-blue-600',
+    accent: 'bg-blue-50',
+    accentBorder: 'border-blue-200',
+    highlight: 'hover:border-blue-200',
+    muted: 'text-gray-500'
   }
 };
 
-// Break type configurations
-const breakTypes = {
-  micro: {
-    trigger: 25,
-    duration: 2,
-    emoji: '👁️',
-    activities: [
-      { sv: "Vila ögonen: Titta 20 fot bort", en: "Rest eyes: Look 20 feet away" },
-      { sv: "Snabbstretch", en: "Quick stretch" },
-      { sv: "Djupandning", en: "Deep breathing" },
-      { sv: "Handledsövningar", en: "Wrist exercises" },
-      { sv: "Hållningskontroll", en: "Posture check" }
-    ]
-  },
-  short: {
-    trigger: 50,
-    duration: 5,
-    emoji: '🔄',
-    activities: [
-      { sv: "Stå och sträck på dig", en: "Stand and stretch" },
-      { sv: "Drick vatten", en: "Get water" },
-      { sv: "Kort promenad", en: "Quick walk" },
-      { sv: "Skrivbordsövningar", en: "Desk exercises" },
-      { sv: "Medveten andning", en: "Mindful breathing" }
-    ]
-  },
-  long: {
-    trigger: 90,
-    duration: 15,
-    emoji: '🌟',
-    activities: [
-      { sv: "Ta en promenad", en: "Take a walk" },
-      { sv: "Komplett stretching", en: "Full stretching" },
-      { sv: "Nyttig mellanmål", en: "Healthy snack" },
-      { sv: "Meditation", en: "Meditation" },
-      { sv: "Frisk luft", en: "Fresh air" }
-    ]
-  }
-};
-
-// Task priority and category configurations
-const priorities = {
-  '!!!': { level: 'high', emoji: '🔴', sv: 'Hög', fatigue: 1.5 },
-  '!!': { level: 'medium', emoji: '🟡', sv: 'Medel', fatigue: 1.2 },
-  '!': { level: 'low', emoji: '🟢', sv: 'Låg', fatigue: 1.0 }
-};
-
-const taskCategories = {
-  '@focus': { emoji: '🧠', sv: 'Fokus', fatigue: 1.3 },
-  '@meeting': { emoji: '👥', sv: 'Möte', fatigue: 1.1 },
-  '@creative': { emoji: '🎨', sv: 'Kreativ', fatigue: 1.2 },
-  '@admin': { emoji: '📋', sv: 'Admin', fatigue: 0.9 },
-  '@exercise': { emoji: '💪', sv: 'Träning', fatigue: 1.4 }
+const breakActivities = {
+  microBreak: [
+    "Eye rest: Look 20 feet away",
+    "Quick stretches",
+    "Deep breathing",
+    "Wrist exercises",
+    "Posture check"
+  ],
+  shortBreak: [
+    "Stand and stretch",
+    "Get water",
+    "Walk around",
+    "Desk exercises",
+    "Mindful breathing"
+  ],
+  longBreak: [
+    "Take a walk",
+    "Full stretching",
+    "Healthy snack",
+    "Meditation",
+    "Fresh air"
+  ]
 };
 
 function TaskSequencer() {
-  // State management
   const [taskInput, setTaskInput] = useState('');
   const [tasks, setTasks] = useState([]);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(-1);
@@ -95,15 +88,9 @@ function TaskSequencer() {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [completedTasks, setCompletedTasks] = useState([]);
+  const [draggedIndex, setDraggedIndex] = useState(null);
   const [theme, setTheme] = useState('light');
-  const [stats, setStats] = useState({
-    dailyFatigue: 0,
-    tasksCompleted: 0,
-    totalBreakTime: 0,
-    productivity: []
-  });
 
-  // Sound management
   const playSound = useCallback((type) => {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = context.createOscillator();
@@ -111,24 +98,23 @@ function TaskSequencer() {
     
     oscillator.connect(gainNode);
     gainNode.connect(context.destination);
+    oscillator.type = 'sine';
     
     switch(type) {
       case 'halfway':
-        oscillator.type = 'sine';
         oscillator.frequency.value = 600;
         gainNode.gain.value = 0.3;
         oscillator.start();
         oscillator.stop(context.currentTime + 0.2);
         break;
       case 'warning':
-        oscillator.type = 'sine';
         oscillator.frequency.value = 400;
         gainNode.gain.value = 0.3;
         oscillator.start();
         oscillator.stop(context.currentTime + 0.5);
         break;
-      case 'complete':
-        oscillator.type = 'sine';
+		case 'complete':
+        // Create pattern: "bep bep bep beeeep"
         let beepTime = context.currentTime;
         
         // Create separate oscillators for each beep
@@ -154,16 +140,18 @@ function TaskSequencer() {
           }
         }
         break;
-      case 'allComplete':
-        oscillator.type = 'square';
+		case 'allComplete':
+        // Victory fanfare: "do-do-do-dooooo!"
+        oscillator.type = 'square'; // More video-game like sound
         gainNode.gain.value = 0.2;
         
-        // Rising victory melody
+        // Rising melody
         const notes = [400, 500, 600, 800];
         const noteDuration = 0.15;
         
         notes.forEach((freq, i) => {
           oscillator.frequency.setValueAtTime(freq, context.currentTime + (i * noteDuration));
+          // Last note held longer
           if (i === notes.length - 1) {
             oscillator.start(context.currentTime + (i * noteDuration));
             oscillator.stop(context.currentTime + (i * noteDuration) + 0.5);
@@ -173,14 +161,11 @@ function TaskSequencer() {
           }
         });
         break;
-      default:
-        break;
     }
   }, []);
 
-  // Helper functions
   const getRandomActivity = useCallback((breakType) => {
-    const activities = breakTypes[breakType].activities;
+    const activities = breakActivities[breakType];
     return activities[Math.floor(Math.random() * activities.length)];
   }, []);
 
@@ -190,7 +175,6 @@ function TaskSequencer() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  // Task input handling
   const handleInputChange = useCallback((e) => {
     const input = e.target.value;
     setTaskInput(input);
@@ -199,102 +183,19 @@ function TaskSequencer() {
       .split('\n')
       .filter(line => line.trim())
       .map(line => {
-        // Parse priority and category
-        const priority = Object.keys(priorities).find(p => line.includes(p)) || '';
-        const category = Object.keys(taskCategories).find(c => line.includes(c)) || '';
-        
         const isUnbreakable = line.includes('!unbreakable');
-        const cleanLine = line
-          .replace('!unbreakable', '')
-          .replace(priority, '')
-          .replace(category, '')
-          .trim();
-        
+        const cleanLine = line.replace('!unbreakable', '').trim();
         const [task, minutes] = cleanLine.split(':').map(part => part.trim());
-        const taskMinutes = parseInt(minutes) || 0;
-
-        // Calculate fatigue factor
-        const priorityFatigue = priorities[priority]?.fatigue || 1;
-        const categoryFatigue = taskCategories[category]?.fatigue || 1;
-        const fatigueFactor = priorityFatigue * categoryFatigue;
-
-        // Base task object
-        const baseTask = {
-          task,
-          originalMinutes: taskMinutes,
-          priority,
-          category,
-          isUnbreakable,
-          fatigueFactor
-        };
-
-        if (isUnbreakable) {
-          return {
-            ...baseTask,
-            minutes: taskMinutes,
-            displayName: `${priorities[priority]?.emoji || ''} ${taskCategories[category]?.emoji || ''} ${task}`
-          };
-        }
-
-        // Split long tasks and add dynamic breaks
-        if (taskMinutes > 30) {
-          const parts = [];
-          let remainingMinutes = taskMinutes;
-          let partNum = 1;
-          let accumulatedFatigue = 0;
-
-          while (remainingMinutes > 0) {
-            // Calculate dynamic break duration based on fatigue
-            accumulatedFatigue += 30 * fatigueFactor;
-            const breakDuration = Math.min(
-              Math.ceil(accumulatedFatigue / 50) * 5, // 5 min break for every 50 fatigue points
-              15 // Max 15 min break
-            );
-
-            if (remainingMinutes > 30) {
-              // Add work chunk
-              parts.push({
-                ...baseTask,
-                minutes: 30,
-                displayName: `${priorities[priority]?.emoji || ''} ${taskCategories[category]?.emoji || ''} ${task} (Del ${partNum})`
-              });
-
-              // Add appropriate break with random activity
-              const breakType = accumulatedFatigue > 90 ? 'long' : 'short';
-              const activity = getRandomActivity(breakType);
-              parts.push({
-                task: `${breakTypes[breakType].emoji} Paus: ${activity.sv}`,
-                minutes: breakDuration,
-                isBreak: true,
-                breakType
-              });
-
-              remainingMinutes -= 30;
-              partNum++;
-            } else {
-              parts.push({
-                ...baseTask,
-                minutes: remainingMinutes,
-                displayName: `${priorities[priority]?.emoji || ''} ${taskCategories[category]?.emoji || ''} ${task} (Del ${partNum})`
-              });
-              remainingMinutes = 0;
-            }
-          }
-          return parts;
-        }
-
         return {
-          ...baseTask,
-          minutes: taskMinutes,
-          displayName: `${priorities[priority]?.emoji || ''} ${taskCategories[category]?.emoji || ''} ${task}`
+          task,
+          minutes: parseInt(minutes) || 0,
+          isUnbreakable
         };
-      })
-      .flat();
+      });
 
     setTasks(parsedTasks);
-  }, [getRandomActivity]);
+  }, []);
 
-  // Task completion handling
   const completeTask = useCallback(() => {
     const currentTask = tasks[currentTaskIndex];
     playSound('complete');
@@ -304,20 +205,12 @@ function TaskSequencer() {
       completedAt: new Date().toLocaleTimeString()
     }]);
 
-    // Update statistics
-    setStats(prev => ({
-      ...prev,
-      tasksCompleted: prev.tasksCompleted + 1,
-      dailyFatigue: prev.dailyFatigue + (currentTask.minutes * (currentTask.fatigueFactor || 1)),
-      totalBreakTime: prev.totalBreakTime + (currentTask.isBreak ? currentTask.minutes : 0)
-    }));
-
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(prev => prev + 1);
       setTimeLeft(tasks[currentTaskIndex + 1].minutes * 60);
       setIsPaused(false);
     } else {
-      playSound('allComplete');
+      playSound('allComplete'); // Add this line to play victory sound
       setIsRunning(false);
       setCurrentTaskIndex(-1);
       setTimeLeft(0);
@@ -325,7 +218,6 @@ function TaskSequencer() {
     }
   }, [currentTaskIndex, tasks, playSound]);
 
-  // Timer effect
   useEffect(() => {
     let timer;
     if (isRunning && !isPaused && timeLeft > 0) {
@@ -354,7 +246,6 @@ function TaskSequencer() {
     return () => clearInterval(timer);
   }, [isRunning, isPaused, timeLeft, currentTaskIndex, tasks, playSound, completeTask]);
 
-  // Sequence control
   const startSequence = useCallback(() => {
     if (tasks.length > 0) {
       setCurrentTaskIndex(0);
@@ -362,22 +253,14 @@ function TaskSequencer() {
       setIsRunning(true);
       setIsPaused(false);
       setCompletedTasks([]);
-      setStats({
-        dailyFatigue: 0,
-        tasksCompleted: 0,
-        totalBreakTime: 0,
-        productivity: []
-      });
     }
   }, [tasks]);
 
-  // Export functionality
   const exportTasks = useCallback(() => {
     const exportData = {
       originalSequence: tasks,
       completedTasks,
-	  exportedAt: new Date().toLocaleString(),
-      stats
+      exportedAt: new Date().toLocaleString()
     };
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -389,41 +272,8 @@ function TaskSequencer() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [tasks, completedTasks, stats]);
+  }, [tasks, completedTasks]);
 
-  // Instructions component
-  const Instructions = () => (
-    <div className={`mb-4 ${themes[theme].panel} rounded-lg p-4`}>
-      <h3 className={`text-lg font-semibold ${themes[theme].text} mb-2`}>Instruktioner:</h3>
-      <div className={`${themes[theme].text} space-y-2 text-sm`}>
-        <p>• Skriv uppgifter på formatet: <code>uppgift : minuter</code></p>
-        <p>• Använd prioriteter: !!! (hög), !! (medel), ! (låg)</p>
-        <p>• Kategorier: @focus, @meeting, @creative, @admin, @exercise</p>
-        <p>• Använd !unbreakable för att förhindra pauser</p>
-        <p>• Långa uppgifter delas automatiskt med pauser</p>
-        <p>Exempel:</p>
-        <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
-          !!! @focus Viktigt projekt : 60{'\n'}
-          !! @meeting Teammöte !unbreakable : 45{'\n'}
-          ! @admin Email : 30
-        </pre>
-      </div>
-    </div>
-  );
-
-  // Statistics component
-  const Statistics = () => (
-    <div className={`mb-4 ${themes[theme].panel} rounded-lg p-4`}>
-      <h3 className={`text-lg font-semibold ${themes[theme].text} mb-2`}>Statistik:</h3>
-      <div className={`${themes[theme].text} space-y-1`}>
-        <p>Avklarade uppgifter: {stats.tasksCompleted}</p>
-        <p>Total paustid: {Math.round(stats.totalBreakTime)} minuter</p>
-        <p>Trötthetsfaktor: {Math.round(stats.dailyFatigue)} / 480</p>
-      </div>
-    </div>
-  );
-
-  // Main render
   return (
     <div className={`min-h-screen p-6 ${themes[theme].bg} transition-colors duration-200`}>
       <div className="max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
@@ -434,19 +284,20 @@ function TaskSequencer() {
             className={`p-2 rounded-lg transition-colors ${theme === key ? `${themes[theme].primary} text-white` : `${themes[theme].panel} ${themes[theme].text}`}`}
             title={value.name}
           >
-            {key === 'light' ? <Sun size={20} /> : <Moon size={20} />}
+            {key === 'light' ? <Sun size={20} /> :
+             key === 'dark' ? <Moon size={20} /> :
+             key === 'soft' ? <Palette size={20} /> :
+             key === 'ocean' ? '🌊' : null}
           </button>
         ))}
       </div>
 
       <div className="max-w-2xl mx-auto">
-        <Instructions />
-
         <div className={`mb-8 ${themes[theme].panel} rounded-lg p-6 transition-colors`}>
           <textarea
             value={taskInput}
             onChange={handleInputChange}
-            placeholder="Skriv uppgifter (en per rad):&#10;uppgift : minuter&#10;Exempel:&#10;!!! @focus Viktigt projekt : 60&#10;!! @meeting Teammöte !unbreakable : 45&#10;! @admin Email : 30"
+            placeholder="Enter tasks (one per line):&#10;task : minutes&#10;Example:&#10;Work on project : 25&#10;Break : 5&#10;Meeting !unbreakable : 60"
             className={`w-full h-48 p-4 border rounded-lg font-mono ${themes[theme].text} ${themes[theme].bg} ${themes[theme].border} focus:ring-2 focus:ring-opacity-50 focus:ring-current outline-none transition-colors`}
           />
           
@@ -456,7 +307,7 @@ function TaskSequencer() {
               disabled={isRunning || tasks.length === 0}
               className={`px-6 py-2 text-white rounded-lg ${themes[theme].primary} disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
             >
-              Starta sekvens
+              Start Sequence
             </button>
             
             {isRunning && (
@@ -483,7 +334,7 @@ function TaskSequencer() {
           <div className="space-y-6">
             <div className={`${themes[theme].accent} border-2 ${themes[theme].accentBorder} rounded-lg p-6 transition-colors`}>
               <h2 className={`text-2xl font-semibold ${themes[theme].text} mb-3`}>
-                Aktuell uppgift: {tasks[currentTaskIndex].displayName || tasks[currentTaskIndex].task}
+                Current Task: {tasks[currentTaskIndex].task}
               </h2>
               <p className={`text-4xl font-mono ${themes[theme].text} mb-4`}>
                 {formatTime(timeLeft)}
@@ -492,15 +343,13 @@ function TaskSequencer() {
                 onClick={completeTask}
                 className={`px-4 py-2 text-white rounded-lg ${themes[theme].primary} transition-colors`}
               >
-                Avsluta uppgift
+                Complete Task
               </button>
             </div>
 
-            <Statistics />
-
             <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors`}>
               <h3 className={`text-lg font-semibold ${themes[theme].text} mb-4`}>
-                Kommande uppgifter
+                Upcoming Tasks
               </h3>
               <div className="space-y-2">
                 {tasks.slice(currentTaskIndex + 1).map((task, index) => (
@@ -509,7 +358,7 @@ function TaskSequencer() {
                     className={`flex items-center p-3 border rounded-lg ${themes[theme].border} ${themes[theme].highlight} transition-colors`}
                   >
                     <GripVertical className={`mr-3 ${themes[theme].muted}`} size={16} />
-                    <span className={themes[theme].text}>{task.displayName || task.task}</span>
+                    <span className={themes[theme].text}>{task.task}</span>
                     <span className={`ml-auto ${themes[theme].muted}`}>{task.minutes}m</span>
                   </div>
                 ))}
