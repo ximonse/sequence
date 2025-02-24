@@ -65,11 +65,11 @@ const TaskSequencer = () => {
     const [currentTaskIndex, setCurrentTaskIndex] = useState(-1);
     const [completedTasks, setCompletedTasks] = useState([]);
     const [draggedIndex, setDraggedIndex] = useState(null);
-    const [theme, setTheme] = useState('light');
-    const [isFlashing, setIsFlashing] = useState(false); // Ny state för blinkande skärm
+    const [theme, setTheme] = useState('dark'); // Börja med mörkt läge
+    const [isFlashing, setIsFlashing] = useState(false); // State för blinkande skärm
 
-const playCompletionSound = useCallback(() => {
-        console.log("playCompletionSound called"); // Lägg till detta för felsökning
+    // Funktion för att spela en kort startsignal
+    const playStartSound = useCallback(() => {
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
@@ -79,24 +79,97 @@ const playCompletionSound = useCallback(() => {
             gainNode.connect(context.destination);
 
             oscillator.type = 'sine';
-            oscillator.frequency.value = 600; // Lite lägre frekvens för ett fylligare ljud
-            gainNode.gain.value = 0.6; // Justera volymen något
+            oscillator.frequency.value = 440; // A4
+            gainNode.gain.value = 0.3;
 
             oscillator.start();
-            oscillator.stop(context.currentTime + 1); // Lite längre ljud
+            oscillator.stop(context.currentTime + 0.3); // Kort signal (300ms)
+        } catch (error) {
+            console.warn('Could not play start sound:', error);
+        }
+    }, []);
 
-			// Skärmblinkning - start 
+    // Funktion för att spela en kort varningssignal
+    const playWarningSound = useCallback(() => {
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 330; // E4
+            gainNode.gain.value = 0.3;
+
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.3); // Kort signal (300ms)
+        } catch (error) {
+            console.warn('Could not play warning sound:', error);
+        }
+    }, []);
+
+    // Funktion för att spela ett slutljud efter hela sekvensen
+    const playFinalSound = useCallback(() => {
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Spela en liten glad melodi
+            const playNote = (freq, start, duration, volume = 0.3) => {
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = freq;
+                gainNode.gain.value = volume;
+                
+                oscillator.start(context.currentTime + start);
+                oscillator.stop(context.currentTime + start + duration);
+            };
+            
+            // Spela en enkel treklang (C-dur)
+            playNote(523.25, 0, 0.15);     // C5
+            playNote(659.25, 0.2, 0.15);   // E5 
+            playNote(783.99, 0.4, 0.3);    // G5 (lite längre)
+            
+        } catch (error) {
+            console.warn('Could not play final sound:', error);
+        }
+    }, []);
+
+    // Funktion för slutförd uppgift med dubbel skärmblinkning
+    const playCompletionSound = useCallback(() => {
+        console.log("playCompletionSound called");
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 600;
+            gainNode.gain.value = 0.6;
+
+            oscillator.start();
+            oscillator.stop(context.currentTime + 1);
+
+            // Skärmblinkning - dubbel blink oavsett tema
             setIsFlashing(true);
             setTimeout(() => {
-                setIsFlashing(false); // Släck ner blinkning efter kort tid
+                setIsFlashing(false);
                 setTimeout(() => {
-                    setIsFlashing(true); // Blink nummer två
+                    setIsFlashing(true);
                     setTimeout(() => {
-                        setIsFlashing(false); // Släck ner blinkning igen
-                    }, 200); // *Längre paus mellan blinkningarna (200ms)*
-                }, 200); // *Längre paus innan andra blinkningen (200ms)*
-            }, 200); // *Längre blinkduration (200ms)*
-            // Skärmblinkning - slut
+                        setIsFlashing(false);
+                    }, 200);
+                }, 200);
+            }, 200);
 
         } catch (error) {
             console.warn('Could not play sound:', error);
@@ -108,8 +181,13 @@ const playCompletionSound = useCallback(() => {
         setCurrentTaskIndex(-1);
         setTimeLeft(0);
         setIsPaused(false);
-        setIsFlashing(false); // Stoppa blinkning om sekvensen stoppas
-    }, []);
+        setIsFlashing(false);
+        
+        // Kolla om det var sista uppgiften i sekvensen som slutfördes
+        if (completedTasks.length > 0 && completedTasks.length === tasks.length) {
+            playFinalSound(); // Spela slutsignalen när alla uppgifter är klara
+        }
+    }, [completedTasks.length, tasks.length, playFinalSound]);
 
     const completeTask = useCallback(() => {
         const currentTask = tasks[currentTaskIndex];
@@ -141,21 +219,32 @@ const playCompletionSound = useCallback(() => {
             setIsRunning(true);
             setIsPaused(false);
             setCompletedTasks([]);
-            setIsFlashing(false); // Se till att blinkning är avstängd vid start
+            setIsFlashing(false);
+            playStartSound(); // Spela startsignal för första uppgiften
         }
-    }, [tasks]);
+    }, [tasks, playStartSound]);
 
     const togglePause = useCallback(() => {
         setIsPaused(prev => !prev);
     }, []);
 
-    // Timer effect
+    // Timer effect med varningssignal
     useEffect(() => {
         let timer;
 
         if (isRunning && !isPaused && timeLeft > 0) {
             timer = setInterval(() => {
                 setTimeLeft(prevTime => {
+                    // Om det är 5 minuter kvar och uppgiften är längre än 9 minuter
+                    const currentTask = tasks[currentTaskIndex];
+                    if (
+                        currentTask && 
+                        currentTask.minutes > 9 && 
+                        prevTime === 5 * 60 // 5 minuter kvar
+                    ) {
+                        playWarningSound();
+                    }
+                    
                     if (prevTime <= 1) {
                         completeTask();
                         return 0;
@@ -169,7 +258,7 @@ const playCompletionSound = useCallback(() => {
                 clearInterval(timer);
             }
         };
-    }, [isRunning, isPaused, completeTask, timeLeft]);
+    }, [isRunning, isPaused, completeTask, timeLeft, playWarningSound, tasks, currentTaskIndex]);
 
     const formatTime = useCallback((seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -281,7 +370,7 @@ const playCompletionSound = useCallback(() => {
 
 
     return (
-        <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? 'bg-white' : ''}`}> {/* Blinkande bakgrund */}
+        <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? 'bg-white' : ''}`}>
             <div className="max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
                 {Object.entries(themes).map(([key, value]) => (
                     <button
@@ -306,7 +395,7 @@ const playCompletionSound = useCallback(() => {
                     <textarea
                         value={taskInput}
                         onChange={handleInputChange}
-                        placeholder="Ange uppgifter (en per rad) i formatet:&#10;uppgiftens namn : minuter&#10;exempel:&#10;Första uppgiften : 20&#10;Paus : 5&#10;Andra uppgiften : 30&#10;&#10;Lägg till !odelbar för uppgifter som inte ska delas upp:&#10;Viktigt möte !odelbar : 45"
+                        placeholder="Ange uppgifter (en per rad) i formatet:&#10;uppgiftens namn : minuter&#10;exempel:&#10;Första uppgiften : 20&#10;Paus : 5&#10;Andra uppgiften : 30"
                         className={`w-full h-48 p-4 border rounded-lg font-mono ${themes[theme].text} ${themes[theme].bg} ${themes[theme].border} focus:ring-2 focus:ring-opacity-50 focus:ring-current outline-none transition-colors`}
                     />
 
@@ -394,7 +483,7 @@ const playCompletionSound = useCallback(() => {
                         <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
                         <ul className="space-y-2">
                             {completedTasks.map((task, index) => (
-                                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center opacity-70 line-through text-gray-500`}> {/* Gråmarkering och striketrough här */}
+                                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center opacity-70 line-through text-gray-500`}>
                                     <div>
                                         <span className={`${themes[theme].text}`}>{task.task}</span>
                                     </div>
