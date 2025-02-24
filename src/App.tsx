@@ -67,6 +67,7 @@ const TaskSequencer = () => {
     const [draggedIndex, setDraggedIndex] = useState(null);
     const [theme, setTheme] = useState('dark'); // Börja med mörkt läge
     const [isFlashing, setIsFlashing] = useState(false); // State för blinkande skärm
+    const [totalTime, setTotalTime] = useState(0); // State för total tid
 
     // Funktion för att spela en kort startsignal
     const playStartSound = useCallback(() => {
@@ -143,7 +144,6 @@ const TaskSequencer = () => {
 
     // Funktion för slutförd uppgift med dubbel skärmblinkning
     const playCompletionSound = useCallback(() => {
-        console.log("playCompletionSound called");
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
@@ -223,6 +223,19 @@ const TaskSequencer = () => {
             playStartSound(); // Spela startsignal för första uppgiften
         }
     }, [tasks, playStartSound]);
+    
+    // Funktion för att formatera total tid
+    const formatTotalTime = useCallback((minutes) => {
+        if (minutes === 0) return "";
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        
+        if (hours > 0) {
+            return `(${hours}h ${mins}min)`;
+        } else {
+            return `(${mins}min)`;
+        }
+    }, []);
 
     const togglePause = useCallback(() => {
         setIsPaused(prev => !prev);
@@ -283,6 +296,10 @@ const TaskSequencer = () => {
                     isUnbreakable
                 };
             });
+            
+            // Beräkna total tid i minuter
+            const totalMinutes = parsedTasks.reduce((sum, task) => sum + (task.minutes || 0), 0);
+            setTotalTime(totalMinutes);
             setTasks(parsedTasks);
         }, 300);
         return () => clearTimeout(timeoutId);
@@ -405,7 +422,7 @@ const TaskSequencer = () => {
                             disabled={isRunning || tasks.length === 0}
                             className={`px-6 py-2 text-white rounded-lg ${themes[theme].primary} disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                         >
-                            Starta Sekvens
+                            Starta Sekvens {!isRunning && totalTime > 0 ? formatTotalTime(totalTime) : ""}
                         </button>
 
                         {isRunning && (
