@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Download, GripVertical, Sun, Moon, Palette, Square } from 'lucide-react';
+import { Play, Pause, Download, GripVertical, Sun, Moon, Palette, Square, Clock } from 'lucide-react';
 
 const TaskSequencer = () => {
     const themes = useMemo(() => ({
@@ -68,6 +68,28 @@ const TaskSequencer = () => {
     const [theme, setTheme] = useState('dark'); // Börja med mörkt läge
     const [isFlashing, setIsFlashing] = useState(false); // State för blinkande skärm
     const [totalTime, setTotalTime] = useState(0); // State för total tid
+    const [startTime, setStartTime] = useState(null); // Ny state för starttid
+
+    // Beräkna sluttiden baserat på totala minuter
+    const calculateEndTime = useCallback((totalMinutes) => {
+        if (totalMinutes === 0) return "";
+        
+        let endTimeDate;
+        if (startTime) {
+            // Om sekvensen pågår, beräkna från starttiden
+            endTimeDate = new Date(startTime.getTime() + totalMinutes * 60 * 1000);
+        } else {
+            // Om sekvensen inte har startat, beräkna från nuvarande tid
+            const now = new Date();
+            endTimeDate = new Date(now.getTime() + totalMinutes * 60 * 1000);
+        }
+        
+        // Formatera tiden som HH:MM
+        const hours = endTimeDate.getHours().toString().padStart(2, '0');
+        const minutes = endTimeDate.getMinutes().toString().padStart(2, '0');
+        
+        return `${hours}:${minutes}`;
+    }, [startTime]);
 
     // Funktion för att spela en kort startsignal
     const playStartSound = useCallback(() => {
@@ -144,6 +166,7 @@ const TaskSequencer = () => {
 
     // Funktion för slutförd uppgift med dubbel skärmblinkning
     const playCompletionSound = useCallback(() => {
+        console.log("playCompletionSound called");
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
@@ -182,6 +205,7 @@ const TaskSequencer = () => {
         setTimeLeft(0);
         setIsPaused(false);
         setIsFlashing(false);
+        setStartTime(null); // Återställ starttiden
         
         // Kolla om det var sista uppgiften i sekvensen som slutfördes
         if (completedTasks.length > 0 && completedTasks.length === tasks.length) {
@@ -220,6 +244,7 @@ const TaskSequencer = () => {
             setIsPaused(false);
             setCompletedTasks([]);
             setIsFlashing(false);
+            setStartTime(new Date()); // Spara den aktuella tidpunkten som starttid
             playStartSound(); // Spela startsignal för första uppgiften
         }
     }, [tasks, playStartSound]);
@@ -231,9 +256,9 @@ const TaskSequencer = () => {
         const mins = minutes % 60;
         
         if (hours > 0) {
-            return `(${hours}h ${mins}min)`;
+            return `${hours}h ${mins}min`;
         } else {
-            return `(${mins}min)`;
+            return `${mins}min`;
         }
     }, []);
 
@@ -363,12 +388,12 @@ const TaskSequencer = () => {
         const currentMinute = Math.floor(elapsedSeconds / 60);
 
         return (
-            <div className="flex flex-wrap gap-1.5 pb-2 mb-4">
+            <div className="flex flex-wrap gap-1 pb-2 mb-4 justify-center sm:justify-start">
                 {minutesArray.map((minute) => (
                     <div
                         key={minute}
                         className={`
-                            w-6 h-6 border rounded-full
+                            w-5 h-5 sm:w-6 sm:h-6 border rounded-full
                             flex items-center justify-center text-xs
                             ${minute < currentMinute
                                 ? `${themes[theme].primary} text-white`
@@ -387,8 +412,8 @@ const TaskSequencer = () => {
 
 
     return (
-        <div className={`min-h-screen p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? 'bg-white' : ''}`}>
-            <div className="max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
+        <div className={`min-h-screen p-2 sm:p-4 md:p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? 'bg-white' : ''}`}>
+            <div className="max-w-full sm:max-w-xl md:max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
                 {Object.entries(themes).map(([key, value]) => (
                     <button
                         key={key}
@@ -407,20 +432,20 @@ const TaskSequencer = () => {
                     </button>
                 ))}
             </div>
-            <div className="max-w-2xl mx-auto">
-                <div className={`mb-8 ${themes[theme].panel} rounded-lg p-6 transition-colors`}>
+            <div className="max-w-full sm:max-w-xl md:max-w-2xl mx-auto">
+                <div className={`mb-8 ${themes[theme].panel} rounded-lg p-4 md:p-6 transition-colors`}>
                     <textarea
                         value={taskInput}
                         onChange={handleInputChange}
                         placeholder="Ange uppgifter (en per rad) i formatet:&#10;uppgiftens namn : minuter&#10;exempel:&#10;Första uppgiften : 20&#10;Paus : 5&#10;Andra uppgiften : 30"
-                        className={`w-full h-48 p-4 border rounded-lg font-mono ${themes[theme].text} ${themes[theme].bg} ${themes[theme].border} focus:ring-2 focus:ring-opacity-50 focus:ring-current outline-none transition-colors`}
+                        className={`w-full h-36 sm:h-48 p-3 sm:p-4 border rounded-lg font-mono text-sm ${themes[theme].text} ${themes[theme].bg} ${themes[theme].border} focus:ring-2 focus:ring-opacity-50 focus:ring-current outline-none transition-colors`}
                     />
 
-                    <div className="mt-4 space-x-3">
+                    <div className="mt-4 flex flex-wrap gap-2">
                         <button
                             onClick={startSequence}
                             disabled={isRunning || tasks.length === 0}
-                            className={`px-6 py-2 text-white rounded-lg ${themes[theme].primary} disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                            className={`px-4 sm:px-6 py-2 text-white rounded-lg ${themes[theme].primary} disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                         >
                             Starta Sekvens {!isRunning && totalTime > 0 ? formatTotalTime(totalTime) : ""}
                         </button>
@@ -429,13 +454,13 @@ const TaskSequencer = () => {
                             <>
                                 <button
                                     onClick={togglePause}
-                                    className={`px-6 py-2 text-white rounded-lg ${themes[theme].secondary} transition-colors`}
+                                    className={`px-4 sm:px-6 py-2 text-white rounded-lg ${themes[theme].secondary} transition-colors`}
                                 >
                                     {isPaused ? <Play className="inline h-5 w-5" /> : <Pause className="inline h-5 w-5" />}
                                 </button>
                                 <button
                                     onClick={stopSequence}
-                                    className={`px-6 py-2 text-white rounded-lg bg-red-500 hover:bg-red-600 transition-colors`}
+                                    className={`px-4 sm:px-6 py-2 text-white rounded-lg bg-red-500 hover:bg-red-600 transition-colors`}
                                 >
                                     <Square className="inline h-5 w-5" />
                                 </button>
@@ -445,7 +470,7 @@ const TaskSequencer = () => {
                         {completedTasks.length > 0 && (
                             <button
                                 onClick={exportTasks}
-                                className={`px-6 py-2 rounded-lg ${themes[theme].panel} ${themes[theme].text} transition-colors`}
+                                className={`px-4 sm:px-6 py-2 rounded-lg ${themes[theme].panel} ${themes[theme].text} transition-colors`}
                             >
                                 <Download className="inline h-5 w-5" />
                             </button>
@@ -454,18 +479,18 @@ const TaskSequencer = () => {
                 </div>
 
                 {isRunning && currentTaskIndex >= 0 && tasks[currentTaskIndex] && (
-                    <div className={`${themes[theme].accent} border-2 ${themes[theme].accentBorder} rounded-lg p-6 transition-colors mb-6`}>
-                        <h2 className={`text-2xl font-semibold ${themes[theme].text} mb-3`}>
+                    <div className={`${themes[theme].accent} border-2 ${themes[theme].accentBorder} rounded-lg p-4 md:p-6 transition-colors mb-6`}>
+                        <h2 className={`text-xl sm:text-2xl font-semibold ${themes[theme].text} mb-3 break-words`}>
                             Aktuell Uppgift: {tasks[currentTaskIndex].task}
                         </h2>
                         <TimelineCells
                             totalMinutes={tasks[currentTaskIndex].minutes}
                             elapsedSeconds={tasks[currentTaskIndex].minutes * 60 - timeLeft}
                         />
-                        <p className={`text-4xl font-mono ${themes[theme].text} mb-4`}>{formatTime(timeLeft)}</p>
+                        <p className={`text-3xl sm:text-4xl font-mono ${themes[theme].text} mb-4`}>{formatTime(timeLeft)}</p>
                         <button
                             onClick={completeTask}
-                            className={`px-4 py-2 text-white rounded-lg ${themes[theme].primary} transition-colors`}
+                            className={`px-3 sm:px-4 py-2 text-white rounded-lg ${themes[theme].primary} transition-colors`}
                         >
                             Slutför Uppgift
                         </button>
@@ -473,8 +498,8 @@ const TaskSequencer = () => {
                 )}
 
                 {isRunning && tasks.length > currentTaskIndex + 1 && (
-                    <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors mb-6`}>
-                        <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Kommande Uppgifter</h2>
+                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-6 transition-colors mb-6`}>
+                        <h2 className={`text-lg sm:text-xl font-semibold ${themes[theme].text} mb-4`}>Kommande Uppgifter</h2>
                         <ul className="space-y-2">
                             {tasks.slice(currentTaskIndex + 1).map((task, index) => (
                                 <li
@@ -484,11 +509,11 @@ const TaskSequencer = () => {
                                     onDragEnd={handleDragEnd}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, currentTaskIndex + 1 + index)}
-                                    className={`relative p-3 rounded-lg ${themes[theme].bg} ${themes[theme].highlight} border-2 ${themes[theme].border} cursor-move flex items-center`}
+                                    className={`relative p-2 sm:p-3 rounded-lg ${themes[theme].bg} ${themes[theme].highlight} border-2 ${themes[theme].border} cursor-move flex items-center`}
                                 >
                                     <GripVertical className="absolute left-1 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-                                    <span className={`ml-4 ${themes[theme].text}`}>{task.task}</span>
-                                    <span className={`ml-auto font-mono text-sm ${themes[theme].muted}`}>{task.minutes} min</span>
+                                    <span className={`ml-4 ${themes[theme].text} break-words pr-12`}>{task.task}</span>
+                                    <span className={`absolute right-2 font-mono text-sm ${themes[theme].muted}`}>{task.minutes} min</span>
                                 </li>
                             ))}
                         </ul>
@@ -496,20 +521,35 @@ const TaskSequencer = () => {
                 )}
 
                 {completedTasks.length > 0 && (
-                    <div className={`${themes[theme].panel} rounded-lg p-6 transition-colors`}>
-                        <h2 className={`text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
+                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-6 transition-colors mb-16`}>
+                        <h2 className={`text-lg sm:text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
                         <ul className="space-y-2">
                             {completedTasks.map((task, index) => (
-                                <li key={index} className={`p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex justify-between items-center opacity-70 line-through text-gray-500`}>
-                                    <div>
+                                <li key={index} className={`p-2 sm:p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex flex-col sm:flex-row sm:justify-between sm:items-center opacity-70 line-through text-gray-500`}>
+                                    <div className="break-words mb-1 sm:mb-0">
                                         <span className={`${themes[theme].text}`}>{task.task}</span>
                                     </div>
-                                    <div className="font-mono text-sm text-right">
+                                    <div className="font-mono text-sm sm:text-right">
                                         <span className={`${themes[theme].muted}`}>Slutfört: {task.completedAt}</span>
                                     </div>
                                 </li>
                             ))}
                         </ul>
+                    </div>
+                )}
+
+                {/* Footer med information om total tid och sluttid */}
+                {isRunning && (
+                    <div className="fixed bottom-0 left-0 right-0 border-t border-opacity-20 border-gray-500">
+                        <div className={`max-w-full sm:max-w-xl md:max-w-2xl mx-auto ${themes[theme].bg} ${themes[theme].text} px-4 py-2 flex justify-between items-center text-xs sm:text-sm opacity-70 hover:opacity-100 transition-opacity`}>
+                            <div className="flex items-center">
+                                <Clock size={16} className="mr-2 opacity-60" />
+                                <span className={`${themes[theme].muted}`}>Total tid: <span className="font-mono">{formatTotalTime(totalTime)}</span></span>
+                            </div>
+                            <div className="flex items-center">
+                                <span className={`${themes[theme].muted}`}>Sluttid: <span className="font-mono">{calculateEndTime(totalTime)}</span></span>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
