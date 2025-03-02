@@ -69,6 +69,10 @@ const TaskSequencer = () => {
     const [isFlashing, setIsFlashing] = useState(false); // State för blinkande skärm
     const [totalTime, setTotalTime] = useState(0); // State för total tid
     const [startTime, setStartTime] = useState(null); // Ny state för starttid
+    
+    // Wake Lock states
+    const [wakeLock, setWakeLock] = useState(null);
+    const [wakeLockSupported, setWakeLockSupported] = useState(false);
 
     // Beräkna sluttiden baserat på totala minuter
     const calculateEndTime = useCallback((totalMinutes) => {
@@ -198,6 +202,98 @@ const TaskSequencer = () => {
             console.warn('Could not play sound:', error);
         }
     }, []);
+
+    // Kontrollera om Wake Lock API stöds
+    useEffect(() => {
+        if ('wakeLock' in navigator) {
+            setWakeLockSupported(true);
+            console.log('Wake Lock API stöds i denna webbläsare');
+        } else {
+            console.log('Wake Lock API stöds INTE i denna webbläsare');
+            setWakeLockSupported(false);
+        }
+    }, []);
+
+    // Hantera Wake Lock beroende på om sekvensen körs eller inte
+    useEffect(() => {
+        let lockRequest = null;
+
+        const requestWakeLock = async () => {
+            if (!wakeLockSupported) return;
+            
+            try {
+                const lock = await navigator.wakeLock.request('screen');
+                setWakeLock(lock);
+                
+                lock.addEventListener('release', () => {
+                    console.log('Wake Lock släpptes av systemet');
+                    setWakeLock(null);
+                    
+                    // Försök begära ett nytt lås om appen fortfarande är aktiv och inte pausad
+                    if (isRunning && !isPaused) {
+                        requestWakeLock();
+                    }
+                });
+                
+                console.log('Wake Lock aktiverad');
+            } catch (err) {
+                console.error(`Kunde inte aktivera Wake Lock: ${err.message}`);
+            }
+        };
+        
+        const releaseWakeLock = async () => {
+            if (wakeLock) {
+                try {
+                    await wakeLock.release();
+                    console.log('Wake Lock släppt manuellt');
+                    setWakeLock(null);
+                } catch (err) {
+                    console.error(`Kunde inte släppa Wake Lock: ${err.message}`);
+                }
+            }
+        };
+        
+        // Aktivera Wake Lock när sekvensen startas och inte är pausad
+        if (isRunning && !isPaused && wakeLockSupported && !wakeLock) {
+            requestWakeLock();
+        }
+        
+        // Släpp Wake Lock när appen pausas eller stoppas
+        if ((!isRunning || isPaused) && wakeLock) {
+            releaseWakeLock();
+        }
+        
+        return () => {
+            if (wakeLock) {
+                releaseWakeLock();
+            }
+        };
+    }, [isRunning, isPaused, wakeLock, wakeLockSupported]);
+
+    // Hantera visibilitychange event för att återaktivera Wake Lock när appen blir synlig igen
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isRunning && !isPaused && wakeLockSupported && !wakeLock) {
+                // Försök begära ett nytt lås när appen blir synlig igen
+                const requestWakeLock = async () => {
+                    try {
+                        const lock = await navigator.wakeLock.request('screen');
+                        setWakeLock(lock);
+                        console.log('Wake Lock återaktiverad efter visibilitychange');
+                    } catch (err) {
+                        console.error(`Kunde inte återaktivera Wake Lock: ${err.message}`);
+                    }
+                };
+                requestWakeLock();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isRunning, isPaused, wakeLock, wakeLockSupported]);
 
     const stopSequence = useCallback(() => {
         setIsRunning(false);
@@ -478,6 +574,16 @@ const TaskSequencer = () => {
                     </div>
                 </div>
 
+                {/* Wake Lock Status Indicator */}
+                {isRunning && wakeLockSupported && (
+                    <div className={`fixed top-2 right-2 text-xs px-2 py-1 rounded-full 
+                        ${wakeLock 
+                            ? `${themes[theme].primary} text-white` 
+                            : `${themes[theme].panel} ${themes[theme].text} opacity-50`}`}>
+                        {wakeLock ? "Skärm låst" : "Skärm olåst"}
+                    </div>
+                )}
+
                 {isRunning && currentTaskIndex >= 0 && tasks[currentTaskIndex] && (
                     <div className={`${themes[theme].accent} border-2 ${themes[theme].accentBorder} rounded-lg p-4 md:p-6 transition-colors mb-6`}>
                         <h2 className={`text-xl sm:text-2xl font-semibold ${themes[theme].text} mb-3 break-words`}>
@@ -498,9 +604,9 @@ const TaskSequencer = () => {
                 )}
 
                 {isRunning && tasks.length > currentTaskIndex + 1 && (
-                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-6 transition-colors mb-6`}>
-                        <h2 className={`text-lg sm:text-xl font-semibold ${themes[theme].text} mb-4`}>Kommande Uppgifter</h2>
-                        <ul className="space-y-2">
+                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-5 transition-colors mb-4`}>
+                        <h2 className={`text-xl sm:text-2xl font-bold ${themes[theme].text} mb-3 border-b-2 ${themes[theme].border} pb-1`}>Kommande Uppgifter</h2>
+                        <ul className="space-y-1">
                             {tasks.slice(currentTaskIndex + 1).map((task, index) => (
                                 <li
                                     key={index}
@@ -511,9 +617,9 @@ const TaskSequencer = () => {
                                     onDrop={(e) => handleDrop(e, currentTaskIndex + 1 + index)}
                                     className={`relative p-2 sm:p-3 rounded-lg ${themes[theme].bg} ${themes[theme].highlight} border-2 ${themes[theme].border} cursor-move flex items-center`}
                                 >
-                                    <GripVertical className="absolute left-1 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-                                    <span className={`ml-4 ${themes[theme].text} break-words pr-12`}>{task.task}</span>
-                                    <span className={`absolute right-2 font-mono text-sm ${themes[theme].muted}`}>{task.minutes} min</span>
+                                    <GripVertical className="absolute left-1 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                                    <span className={`ml-6 ${themes[theme].text} break-words pr-16 text-base sm:text-xl font-medium`}>{task.task}</span>
+                                    <span className={`absolute right-2 font-mono text-base sm:text-xl font-bold ${themes[theme].muted}`}>{task.minutes} min</span>
                                 </li>
                             ))}
                         </ul>
@@ -521,16 +627,16 @@ const TaskSequencer = () => {
                 )}
 
                 {completedTasks.length > 0 && (
-                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-6 transition-colors mb-16`}>
-                        <h2 className={`text-lg sm:text-xl font-semibold ${themes[theme].text} mb-4`}>Slutförda Uppgifter</h2>
-                        <ul className="space-y-2">
+                    <div className={`${themes[theme].panel} rounded-lg p-4 md:p-5 transition-colors mb-16`}>
+                        <h2 className={`text-xl sm:text-2xl font-bold ${themes[theme].text} mb-3 border-b-2 ${themes[theme].border} pb-1`}>Slutförda Uppgifter</h2>
+                        <ul className="space-y-1">
                             {completedTasks.map((task, index) => (
                                 <li key={index} className={`p-2 sm:p-3 rounded-lg ${themes[theme].bg} border-2 ${themes[theme].border} flex flex-col sm:flex-row sm:justify-between sm:items-center opacity-70 line-through text-gray-500`}>
                                     <div className="break-words mb-1 sm:mb-0">
-                                        <span className={`${themes[theme].text}`}>{task.task}</span>
+                                        <span className={`text-gray-500 text-base sm:text-xl font-medium`}>{task.task}</span>
                                     </div>
-                                    <div className="font-mono text-sm sm:text-right">
-                                        <span className={`${themes[theme].muted}`}>Slutfört: {task.completedAt}</span>
+                                    <div className="font-mono text-base sm:text-xl sm:text-right">
+                                        <span className={`text-gray-500 font-medium`}>Slutfört: {task.completedAt}</span>
                                     </div>
                                 </li>
                             ))}
@@ -540,14 +646,11 @@ const TaskSequencer = () => {
 
                 {/* Footer med information om total tid och sluttid */}
                 {isRunning && (
-                    <div className="fixed bottom-0 left-0 right-0 border-t border-opacity-20 border-gray-500">
-                        <div className={`max-w-full sm:max-w-xl md:max-w-2xl mx-auto ${themes[theme].bg} ${themes[theme].text} px-4 py-2 flex justify-between items-center text-xs sm:text-sm opacity-70 hover:opacity-100 transition-opacity`}>
+                    <div className="fixed bottom-0 left-0 right-0 border-t border-opacity-30 border-gray-500">
+                        <div className={`max-w-full sm:max-w-xl md:max-w-2xl mx-auto ${themes[theme].bg} ${themes[theme].text} px-4 py-3 flex justify-between items-center text-sm sm:text-base opacity-90 hover:opacity-100 transition-opacity`}>
                             <div className="flex items-center">
-                                <Clock size={16} className="mr-2 opacity-60" />
-                                <span className={`${themes[theme].muted}`}>Total tid: <span className="font-mono">{formatTotalTime(totalTime)}</span></span>
-                            </div>
-                            <div className="flex items-center">
-                                <span className={`${themes[theme].muted}`}>Sluttid: <span className="font-mono">{calculateEndTime(totalTime)}</span></span>
+                                <Clock size={20} className="mr-2 opacity-70" />
+                                <span className={`${themes[theme].muted} font-medium`}>Sluttid: <span className="font-mono font-bold">{calculateEndTime(totalTime)}</span></span>
                             </div>
                         </div>
                     </div>
@@ -557,4 +660,7 @@ const TaskSequencer = () => {
     );
 };
 
-export default TaskSequencer;
+export default TaskSequencer;-medium`}>Total tid: <span className="font-mono font-bold">{formatTotalTime(totalTime)}</span></span>
+                            </div>
+                            <div className="flex items-center">
+                                <span className={`${themes[theme].muted} font
