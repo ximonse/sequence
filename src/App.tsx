@@ -645,16 +645,22 @@ const TaskSequencer = () => {
                 )}
 
                 {/* Footer med information om total tid och sluttid */}
-{isRunning && (
-    <div className="fixed bottom-0 left-0 right-0 border-t border-opacity-30 border-gray-500">
-        <div className={`max-w-full sm:max-w-xl md:max-w-2xl mx-auto ${themes[theme].bg} ${themes[theme].text} px-4 py-3 flex justify-between items-center text-sm sm:text-base opacity-90 hover:opacity-100 transition-opacity`}>
-            <div className="flex items-center">
-                <Clock size={20} className="mr-2 opacity-70" />
-                <span className={`${themes[theme].muted} font-medium`}>Total tid: <span className="font-mono font-bold">{formatTotalTime(totalTime)}</span></span>
-            </div>
-            <div className="flex items-center">
-                <span className={`${themes[theme].muted} font-medium`}>Sluttid: <span className="font-mono font-bold">{calculateEndTime(totalTime)}</span></span>
+                {isRunning && (
+                    <div className="fixed bottom-0 left-0 right-0 border-t border-opacity-30 border-gray-500">
+                        <div className={`max-w-full sm:max-w-xl md:max-w-2xl mx-auto ${themes[theme].bg} ${themes[theme].text} px-4 py-3 flex justify-between items-center text-sm sm:text-base opacity-90 hover:opacity-100 transition-opacity`}>
+                            <div className="flex items-center">
+                                <Clock size={20} className="mr-2 opacity-70" />
+                                <span className={`${themes[theme].muted} font-medium`}>Total tid: <span className="font-mono font-bold">{formatTotalTime(totalTime)}</span></span>
+                            </div>
+                            <div className="flex items-center">
+                                <span className={`${themes[theme].muted} font-medium`}>Sluttid: <span className="font-mono font-bold">{calculateEndTime(totalTime)}</span></span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
-    </div>
-)}
+    );
+};
+
+export default TaskSequencer;
