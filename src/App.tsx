@@ -148,78 +148,159 @@ const TaskSequencer = () => {
             oscillator.connect(gainNode);
             gainNode.connect(context.destination);
 
-            oscillator.type = 'sine';
+            oscillator.type = 'triangle'; // Richer sound than sine wave
             oscillator.frequency.value = 330; // E4
-            gainNode.gain.value = 0.3;
+            gainNode.gain.value = 0.4; // Slightly louder
 
             oscillator.start();
             oscillator.stop(context.currentTime + 0.3); // Kort signal (300ms)
+            
+            // Quick visual alert
+            setFlashColor('yellow');
+            setIsFlashing(true);
+            setTimeout(() => {
+                setIsFlashing(false);
+            }, 150);
+            
         } catch (error) {
             console.warn('Could not play warning sound:', error);
         }
     }, []);
 
-    // Roligare slutsignal - en liten celebrationsmelodi
+    // Roligare slutsignal - en festlig celebrationsmelodi med visuell feedback
     const playFinalSound = useCallback(() => {
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Spela en liten glad melodi med effekter
-            const playNote = (freq, start, duration, volume = 0.3, type = 'sine') => {
+            // Skapa en master gain node för kontroll över hela ljudbilden
+            const masterGain = context.createGain();
+            masterGain.gain.value = 0.8;
+            masterGain.connect(context.destination);
+            
+            // Skapa reverb-effekt för mer rymd i ljudet
+            const convolver = context.createConvolver();
+            const reverbTime = 2; // sekunder
+            const sampleRate = context.sampleRate;
+            const length = sampleRate * reverbTime;
+            const impulse = context.createBuffer(2, length, sampleRate);
+            
+            // Skapa impulssvar för reverb
+            for (let channel = 0; channel < 2; channel++) {
+                const impulseData = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    impulseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 4);
+                }
+            }
+            
+            convolver.buffer = impulse;
+            convolver.connect(masterGain);
+            
+            // Spela en avancerad glad melodi med effekter
+            const playNote = (freq, start, duration, volume = 0.3, type = 'sine', pan = 0, reverb = false) => {
                 const oscillator = context.createOscillator();
                 const gainNode = context.createGain();
+                const panner = context.createStereoPanner();
                 
-                // Lägg till filter för roligare ljud
+                // Lägg till filter för mer karaktär
                 const filter = context.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.value = 1000;
-                filter.Q.value = 5;
+                filter.frequency.value = 1500 + Math.random() * 1000;
+                filter.Q.value = 8;
                 
                 oscillator.connect(filter);
                 filter.connect(gainNode);
-                gainNode.connect(context.destination);
+                gainNode.connect(panner);
+                
+                // Lägg till panning för bredare stereoeffekt
+                panner.pan.value = pan;
+                
+                if (reverb) {
+                    panner.connect(convolver);
+                } else {
+                    panner.connect(masterGain);
+                }
                 
                 oscillator.type = type;
                 oscillator.frequency.value = freq;
                 
-                // Addera lite attack och release för mjukare ljud
+                // Addera attack, decay, sustain, release (ADSR) för mer levande ljud
                 gainNode.gain.setValueAtTime(0, context.currentTime + start);
                 gainNode.gain.linearRampToValueAtTime(volume, context.currentTime + start + 0.05);
-                gainNode.gain.linearRampToValueAtTime(0, context.currentTime + start + duration);
+                gainNode.gain.linearRampToValueAtTime(volume * 0.8, context.currentTime + start + duration * 0.3);
+                gainNode.gain.setValueAtTime(volume * 0.8, context.currentTime + start + duration * 0.6);
+                gainNode.gain.linearRampToValueAtTime(0, context.currentTime + start + duration + 0.1);
+                
+                // Lägg till lite vibrato på längre toner
+                if (duration > 0.2) {
+                    const lfo = context.createOscillator();
+                    const lfoGain = context.createGain();
+                    lfo.frequency.value = 6;
+                    lfoGain.gain.value = 5;
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(oscillator.frequency);
+                    lfo.start(context.currentTime + start + 0.1);
+                    lfo.stop(context.currentTime + start + duration);
+                }
                 
                 oscillator.start(context.currentTime + start);
-                oscillator.stop(context.currentTime + start + duration + 0.1);
+                oscillator.stop(context.currentTime + start + duration + 0.2);
             };
             
-            // Spela en gladare fanfarmelodi
-            playNote(523.25, 0, 0.1, 0.5, 'triangle');     // C5
-            playNote(659.25, 0.1, 0.1, 0.5, 'triangle');   // E5
-            playNote(783.99, 0.2, 0.1, 0.5, 'triangle');   // G5
-            playNote(1046.50, 0.3, 0.3, 0.6, 'square');    // C6 (festlig avslutning)
+            // Spela en festligare och mer komplex fanfarmelodi
+            // Huvudtema - glatt uppåtgående arpeggio
+            playNote(523.25, 0, 0.12, 0.5, 'triangle', -0.3);     // C5
+            playNote(659.25, 0.1, 0.12, 0.5, 'triangle', 0);      // E5
+            playNote(783.99, 0.2, 0.12, 0.5, 'triangle', 0.3);    // G5
+            playNote(1046.50, 0.3, 0.3, 0.6, 'square', 0, true);  // C6 (festlig avslutning)
             
-            // Lägg till lite rytmiska "fireworks"
-            playNote(1318.51, 0.4, 0.05, 0.3, 'sawtooth'); // E6
-            playNote(1567.98, 0.5, 0.05, 0.3, 'sawtooth'); // G6
-            playNote(2093.00, 0.6, 0.4, 0.4, 'triangle');  // C7
+            // Rytmiska "fireworks" toner som sprids i stereofältet
+            playNote(1318.51, 0.4, 0.06, 0.35, 'sawtooth', -0.6); // E6 (vänster)
+            playNote(1567.98, 0.46, 0.06, 0.35, 'sawtooth', 0.6); // G6 (höger)
+            playNote(1318.51, 0.52, 0.06, 0.35, 'sawtooth', 0.4); // E6 (höger)
+            playNote(1567.98, 0.58, 0.06, 0.35, 'sawtooth', -0.4); // G6 (vänster)
+            
+            // Grandios avslutning
+            playNote(2093.00, 0.65, 0.5, 0.45, 'triangle', 0, true);  // C7
+            playNote(1046.50, 0.7, 0.4, 0.3, 'square', -0.3, true);   // C6 (harmonisk förstärkning)
+            playNote(1318.51, 0.75, 0.3, 0.25, 'sine', 0.3, true);    // E6 (kompletterande harmoni)
+            
+            // Sparkly effekter på slutet
+            for (let i = 0; i < 8; i++) {
+                const pitch = 2093 + Math.random() * 700;
+                const startTime = 0.9 + i * 0.04;
+                const pan = Math.random() * 2 - 1;
+                playNote(pitch, startTime, 0.08, 0.15 - i * 0.01, 'sine', pan);
+            }
 
-            // Större visuell celebration - blinka med grön skärm
-            setFlashColor('green');
-            setIsFlashing(true);
-            setTimeout(() => {
-                setIsFlashing(false);
-                setTimeout(() => {
+            // Större visuell celebration - kraftigare och mer varierad grön blinkning
+            const flashCelebration = () => {
+                let flashCount = 0;
+                const maxFlashes = 7;
+                const colors = ['green', 'lime', 'green', 'lime', 'green', 'lime', 'white'];
+                
+                const doFlash = () => {
+                    if (flashCount >= maxFlashes) return;
+                    
+                    setFlashColor(colors[flashCount]);
                     setIsFlashing(true);
+                    
+                    // Gradvis kortare blinkar för mer intensiv känsla
+                    const duration = 300 - flashCount * 20;
+                    
                     setTimeout(() => {
                         setIsFlashing(false);
-                        setTimeout(() => {
-                            setIsFlashing(true);
-                            setTimeout(() => {
-                                setIsFlashing(false);
-                            }, 300);
-                        }, 300);
-                    }, 300);
-                }, 300);
-            }, 300);
+                        flashCount++;
+                        
+                        // Gradvis kortare pauser
+                        const pause = 150 - flashCount * 10;
+                        setTimeout(doFlash, pause);
+                    }, duration);
+                };
+                
+                doFlash();
+            };
+            
+            flashCelebration();
             
         } catch (error) {
             console.warn('Could not play final sound:', error);
@@ -231,34 +312,56 @@ const TaskSequencer = () => {
         console.log("playCompletionSound called");
         try {
             const context = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = context.createOscillator();
-            const gainNode = context.createGain();
+            
+            // Create a more complex sound with multiple oscillators
+            const masterGain = context.createGain();
+            masterGain.gain.value = 0.7;
+            masterGain.connect(context.destination);
+            
+            // Main tone (higher pitch for completion)
+            const oscillator1 = context.createOscillator();
+            const gain1 = context.createGain();
+            oscillator1.type = 'triangle';
+            oscillator1.frequency.value = 700; // Higher frequency
+            gain1.gain.setValueAtTime(0, context.currentTime);
+            gain1.gain.linearRampToValueAtTime(0.7, context.currentTime + 0.05);
+            gain1.gain.linearRampToValueAtTime(0, context.currentTime + 0.8);
+            oscillator1.connect(gain1);
+            gain1.connect(masterGain);
+            
+            // Secondary tone (add richness)
+            const oscillator2 = context.createOscillator();
+            const gain2 = context.createGain();
+            oscillator2.type = 'square';
+            oscillator2.frequency.value = 350; // Lower octave
+            gain2.gain.setValueAtTime(0, context.currentTime);
+            gain2.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.1);
+            gain2.gain.linearRampToValueAtTime(0, context.currentTime + 0.6);
+            oscillator2.connect(gain2);
+            gain2.connect(masterGain);
+            
+            oscillator1.start();
+            oscillator2.start();
+            oscillator1.stop(context.currentTime + 1);
+            oscillator2.stop(context.currentTime + 1);
 
-            oscillator.connect(gainNode);
-            gainNode.connect(context.destination);
-
-            oscillator.type = 'triangle'; // Ändrat från 'sine' för rikare ljud
-            oscillator.frequency.value = 600;
-            gainNode.gain.value = 0.6;
-
-            oscillator.start();
-            oscillator.stop(context.currentTime + 1);
-
-            // Skärmblinkning - orange blink
-            setFlashColor('orange');
-            setIsFlashing(true);
-            setTimeout(() => {
-                setIsFlashing(false);
+            // More intense orange flashing - three blinks with increasing intensity
+            const flashIntensity = (iteration) => {
+                // Set color with increasing intensity
+                setFlashColor('orange');
+                setIsFlashing(true);
                 setTimeout(() => {
-                    setIsFlashing(true);
-                    setTimeout(() => {
-                        setIsFlashing(false);
-                    }, 300);
-                }, 300);
-            }, 300);
+                    setIsFlashing(false);
+                    if (iteration < 2) {
+                        setTimeout(() => flashIntensity(iteration + 1), 150); // Faster blink
+                    }
+                }, 180 - iteration * 30); // Gradually shorter flash
+            };
+            
+            flashIntensity(0);
 
         } catch (error) {
-            console.warn('Could not play sound:', error);
+            console.warn('Could not play completion sound:', error);
         }
     }, []);
 
@@ -573,7 +676,7 @@ const TaskSequencer = () => {
 
 
     return (
-        <div className={`min-h-screen p-2 sm:p-4 md:p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? `bg-${flashColor}` : ''} ${theme === 'neon' ? themes[theme].shadow : ''}`}>
+        <div className={`min-h-screen p-2 sm:p-4 md:p-6 ${themes[theme].bg} ${themes[theme].text} transition-colors duration-200 ${isFlashing ? (flashColor === 'orange' ? 'bg-orange-500' : flashColor === 'green' ? 'bg-green-500' : flashColor === 'lime' ? 'bg-lime-400' : flashColor === 'yellow' ? 'bg-yellow-400' : 'bg-white') : ''} ${theme === 'neon' ? themes[theme].shadow : ''}`}>
             <div className="max-w-full sm:max-w-xl md:max-w-2xl mx-auto mb-4 flex justify-end space-x-2">
                 {Object.entries(themes).map(([key, value]) => (
                     <button
